@@ -47,7 +47,7 @@
 
 [[constraint]]
   name = "github.com/xitongsys/parquet-go"
-  revision = "c72cb80ee8b868facf3668841462b3628545af63"
+  revision = "0977660f0d299ef3d2b541c6626c6ed73c4f6ce7"
 
 [prune]
   go-tests = true
