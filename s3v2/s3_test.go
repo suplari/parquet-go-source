@@ -5,11 +5,9 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/ioutil"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/golang/mock/gomock"
 	"github.com/xitongsys/parquet-go-source/s3v2/mocks"
 )
@@ -79,11 +77,12 @@ func TestReadBodyLargerThanProvidedBuffer(t *testing.T) {
 	defer ctrl.Finish()
 
 	buf := bytes.NewBufferString("some body data that is larger than expected")
-	bufReadCloser := ioutil.NopCloser(buf)
+	bufReadCloser := io.NopCloser(buf)
 	mockClient := mocks.NewMockS3API(ctrl)
 	mockClient.EXPECT().GetObject(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&s3.GetObjectOutput{Body: bufReadCloser}, nil)
 	s := &S3File{
+		ctx:      context.Background(),
 		client:   mockClient,
 		fileSize: 100,
 		offset:   10,
@@ -106,11 +105,12 @@ func TestReadDownloadError(t *testing.T) {
 
 	errMessage := "some download error"
 	buf := bytes.NewBufferString("some data")
-	bufReadCloser := ioutil.NopCloser(buf)
+	bufReadCloser := io.NopCloser(buf)
 	mockClient := mocks.NewMockS3API(ctrl)
 	mockClient.EXPECT().GetObject(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&s3.GetObjectOutput{Body: bufReadCloser}, errors.New(errMessage))
 	s := &S3File{
+		ctx:      context.Background(),
 		client:   mockClient,
 		fileSize: 100,
 		offset:   10,
@@ -133,11 +133,12 @@ func TestRead(t *testing.T) {
 
 	data := "some data"
 	buf := bytes.NewBufferString(data)
-	bufReadCloser := ioutil.NopCloser(buf)
+	bufReadCloser := io.NopCloser(buf)
 	mockClient := mocks.NewMockS3API(ctrl)
 	mockClient.EXPECT().GetObject(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&s3.GetObjectOutput{Body: bufReadCloser}, nil)
 	s := &S3File{
+		ctx:      context.Background(),
 		client:   mockClient,
 		fileSize: 100,
 		offset:   0,
@@ -185,7 +186,7 @@ func TestWrite(t *testing.T) {
 	key := "test/foobar.parquet"
 
 	mockClient := mocks.NewMockS3API(ctrl)
-	mockClient.EXPECT().PutObject(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+	mockClient.EXPECT().PutObject(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&s3.PutObjectOutput{}, nil)
 
 	s := &S3File{
@@ -257,7 +258,7 @@ func TestOpen(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient := mocks.NewMockS3API(ctrl)
-	mockClient.EXPECT().HeadObject(ctx, gomock.Any()).
+	mockClient.EXPECT().HeadObject(ctx, gomock.Any(), gomock.Any()).
 		Return(&s3.HeadObjectOutput{ContentLength: &fileSize}, nil)
 	s := &S3File{
 		ctx:        ctx,
@@ -300,7 +301,7 @@ func TestCreate(t *testing.T) {
 	key := "test/foobar.parquet"
 
 	mockClient := mocks.NewMockS3API(ctrl)
-	mockClient.EXPECT().PutObject(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+	mockClient.EXPECT().PutObject(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&s3.PutObjectOutput{}, nil)
 	s := &S3File{
 		ctx:        context.Background(),
@@ -351,7 +352,7 @@ func TestOpenWriteUploadFailuresPreventFurtherWrites(t *testing.T) {
 	key := "test/foobar.parquet"
 
 	mockClient := mocks.NewMockS3API(ctrl)
-	mockClient.EXPECT().PutObject(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+	mockClient.EXPECT().PutObject(gomock.Any(), gomock.Any(), gomock.Any()).
 		Return(&s3.PutObjectOutput{}, errors.New(errMessage))
 
 	s := &S3File{
@@ -401,7 +402,7 @@ func TestOpenReadFileSizeError(t *testing.T) {
 	ctx := context.Background()
 	mockClient := mocks.NewMockS3API(ctrl)
 	mockClient.EXPECT().HeadObject(ctx, gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, hoi *s3.HeadObjectInput, arg2 ...request.Option) (*s3.HeadObjectOutput, error) {
+		DoAndReturn(func(_ context.Context, hoi *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
 			if *hoi.Bucket != bucket {
 				t.Errorf("expected bucket %q but got %q", bucket, *hoi.Bucket)
 			}
@@ -437,7 +438,7 @@ func TestOpenRead(t *testing.T) {
 	ctx := context.Background()
 	mockClient := mocks.NewMockS3API(ctrl)
 	mockClient.EXPECT().HeadObject(ctx, gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, hoi *s3.HeadObjectInput, arg2 ...request.Option) (*s3.HeadObjectOutput, error) {
+		DoAndReturn(func(_ context.Context, hoi *s3.HeadObjectInput, optFns ...func(*s3.Options)) (*s3.HeadObjectOutput, error) {
 			if *hoi.Bucket != bucket {
 				t.Errorf("expected bucket %q but got %q", bucket, *hoi.Bucket)
 			}
